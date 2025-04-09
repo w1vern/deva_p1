@@ -1,0 +1,85 @@
+
+
+services:
+  postgres:
+    image: postgres:16
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./deva_p1_back
+      target: production
+    command: bash -c "uvicorn back.main:app --host 0.0.0.0 --port 8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_IP}:${DB_PORT}/${DB_NAME}
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+    ports:
+      - "8000:8000"
+    depends_on:
+      alembic: 
+        condition: service_started
+      postgres: 
+        condition: service_started
+      redis: 
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      
+    networks:
+      - app-network
+
+  alembic:
+    build:
+      context: ./deva_p1_back
+      target: production
+    command: alembic upgrade head
+    restart: no
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_IP}:${DB_PORT}/${DB_NAME}
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  app-network:
+    driver: bridge
