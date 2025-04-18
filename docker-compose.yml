@@ -1,4 +1,17 @@
+version: "3.9"
 
+x-ai-base: &ai-base
+  env_file:
+    - .env
+  depends_on:
+    postgres:
+      condition: service_started
+    rabbitmq:
+      condition: service_healthy
+  volumes:
+    - ./hugging_face_cache:/root/.cache/huggingface
+  networks:
+    - app-network
 
 services:
   postgres:
@@ -16,28 +29,28 @@ services:
 
   redis:
     image: redis:7
-    volumes:
-      - redis_data:/data'
     ports:
-      - 6379:6379
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
     networks:
       - app-network
 
   rabbitmq:
     image: rabbitmq:3-management
     ports:
-      - 5672:5672
-      - 15672:15672
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - app-network
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 10s
+    networks:
+      - app-network
 
   minio:
     image: minio/minio:latest
@@ -45,10 +58,10 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    command: server --console-address ":9001" /data
     environment:
       MINIO_ROOT_USER: ${MINIO_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
-    command: server --console-address ":9001" /data
     volumes:
       - minio_data:/data
     networks:
@@ -59,18 +72,15 @@ services:
     depends_on:
       minio:
         condition: service_started
-
-    entrypoint: >
+    entrypoint: |
       /bin/sh -c "
-      echo ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
       /usr/bin/mc config host add myminio http://minio:9000 ${MINIO_USER} ${MINIO_PASSWORD};
       /usr/bin/mc mb myminio/${MINIO_BUCKET};
       /usr/bin/mc admin user svcacct add \
-      --access-key ${MINIO_ACCESS_KEY} \
-      --secret-key ${MINIO_SECRET_KEY} \
-      myminio ${MINIO_USER};
-      exit 0;
-      "
+        --access-key ${MINIO_ACCESS_KEY} \
+        --secret-key ${MINIO_SECRET_KEY} \
+        myminio ${MINIO_USER};
+      exit 0;"
     networks:
       - app-network
 
@@ -84,65 +94,61 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      alembic: 
+      alembic:
         condition: service_started
-      postgres: 
+      postgres:
         condition: service_started
-      redis: 
+      redis:
         condition: service_started
       rabbitmq:
         condition: service_healthy
     networks:
       - app-network
 
-  ai-transcribe:
+  ai-transcribe-cpu:
+    <<: *ai-base
     build:
       context: ./deva_transcript
       dockerfile: Dockerfile.cpu
-    env_file:
-      - .env
     environment:
       - TASK_TYPE=transcribe
-    depends_on:
-      alembic: 
-        condition: service_started
-      postgres: 
-        condition: service_started
-      rabbitmq:
-        condition: service_healthy 
-    volumes:
-      - ./hugging_face_cache:/root/.cache/huggingface
-    networks:
-      - app-network
+    profiles:
+      - cpu
+
+  ai-transcribe-gpu:
+    <<: *ai-base
+    build:
+      context: ./deva_transcript
+      dockerfile: Dockerfile.nvidia
+    environment:
+      - TASK_TYPE=transcribe
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+    profiles:
+      - gpu
 
   ai-summary:
+    <<: *ai-base
     build:
       context: ./deva_transcript
       dockerfile: Dockerfile.cpu
-    env_file:
-      - .env
     environment:
       - TASK_TYPE=summary
-    depends_on:
-      alembic: 
-        condition: service_started
-      postgres: 
-        condition: service_started
-      rabbitmq:
-        condition: service_healthy 
-    networks:
-      - app-network
 
   alembic:
     build:
       context: ./deva_p1_back
       target: production
     command: alembic upgrade head
-    restart: no
+    restart: "no"
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_IP}:${DB_PORT}/${DB_NAME}
+      DATABASE_URL: >
+        postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_IP}:${DB_PORT}/${DB_NAME}
     depends_on:
       - postgres
     networks:
