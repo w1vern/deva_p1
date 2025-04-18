@@ -1,3 +1,6 @@
 [submodule "deva_p1_back"]
 	path = deva_p1_back
 	url = https://github.com/w1vern/deva_p1_back
+[submodule "deva_transcript"]
+	path = deva_transcript
+	url = https://github.com/dmelackov/deva_transcript
