@@ -1,0 +1,165 @@
+
+
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7
+    volumes:
+      - redis_data:/data'
+    ports:
+      - 6379:6379
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    command: server --console-address ":9001" /data
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+
+    entrypoint: >
+      /bin/sh -c "
+      echo ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
+      /usr/bin/mc config host add myminio http://minio:9000 ${MINIO_USER} ${MINIO_PASSWORD};
+      /usr/bin/mc mb myminio/${MINIO_BUCKET};
+      /usr/bin/mc admin user svcacct add \
+      --access-key ${MINIO_ACCESS_KEY} \
+      --secret-key ${MINIO_SECRET_KEY} \
+      myminio ${MINIO_USER};
+      exit 0;
+      "
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./deva_p1_back
+      target: production
+    command: bash -c "uvicorn back.main:app --host 0.0.0.0 --port 8000"
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      alembic: 
+        condition: service_started
+      postgres: 
+        condition: service_started
+      redis: 
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  ai_transcript_gpu:
+    build:
+      context: ./deva_transcript
+      dockerfile: Dockerfile.nvidia
+    env_file:
+      - .env
+    environment:
+      - TASK_TYPE=transcribe
+    depends_on:
+      alembic: 
+        condition: service_started
+      postgres: 
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy 
+    volumes:
+      - ./hugging_face_cache:/root/.cache/huggingface
+    networks:
+      - app-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+
+
+  ai-summary:
+    build:
+      context: ./deva_transcript
+      dockerfile: Dockerfile.cpu
+    env_file:
+      - .env
+    environment:
+      - TASK_TYPE=summary
+    depends_on:
+      alembic: 
+        condition: service_started
+      postgres: 
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy 
+    networks:
+      - app-network
+
+  alembic:
+    build:
+      context: ./deva_p1_back
+      target: production
+    command: alembic upgrade head
+    restart: no
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_IP}:${DB_PORT}/${DB_NAME}
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+
+networks:
+  app-network:
+    driver: bridge
