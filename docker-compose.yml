@@ -9,7 +9,7 @@ x-ai-base: &ai-base
     rabbitmq:
       condition: service_healthy
   volumes:
-    - ./hugging_face_cache:/root/.cache/huggingface
+    - ./cache/hugging_face_cache:/root/.cache/huggingface
   networks:
     - app-network
 
