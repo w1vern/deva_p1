@@ -8,6 +8,8 @@ x-ai-base: &ai-base
       condition: service_started
     rabbitmq:
       condition: service_healthy
+    minio:
+      condition: service_healthy
   volumes:
     - ./cache/hugging_face_cache:/root/.cache/huggingface
   networks:
@@ -67,20 +69,28 @@ services:
     networks:
       - app-network
 
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
   createbuckets:
     image: minio/mc:latest
     depends_on:
       minio:
-        condition: service_started
-    entrypoint: |
+        condition: service_healthy
+
+    entrypoint: >
       /bin/sh -c "
       /usr/bin/mc config host add myminio http://minio:9000 ${MINIO_USER} ${MINIO_PASSWORD};
       /usr/bin/mc mb myminio/${MINIO_BUCKET};
       /usr/bin/mc admin user svcacct add \
-        --access-key ${MINIO_ACCESS_KEY} \
-        --secret-key ${MINIO_SECRET_KEY} \
-        myminio ${MINIO_USER};
-      exit 0;"
+      --access-key ${MINIO_ACCESS_KEY} \
+      --secret-key ${MINIO_SECRET_KEY} \
+      myminio ${MINIO_USER};
+      exit 0;
+      "
     networks:
       - app-network
 
@@ -101,6 +111,8 @@ services:
       redis:
         condition: service_started
       rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     networks:
       - app-network
