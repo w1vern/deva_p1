@@ -4,3 +4,6 @@
 [submodule "deva_transcript"]
 	path = deva_transcript
 	url = https://github.com/dmelackov/deva_transcript
+[submodule "deva-proj1-front"]
+	path = deva-proj1-front
+	url = https://github.com/ImmortalAI/deva-proj1-front
