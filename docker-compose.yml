@@ -179,6 +179,14 @@ services:
     environment:
       - TASK_TYPE=summary
 
+  ai-frames_extractor:
+    <<: *ai-base
+    build:
+      context: ./deva_transcript
+      dockerfile: Dockerfile.cpu
+    environment:
+      - TASK_TYPE=frames_extract
+
   alembic:
     build:
       context: ./deva_p1_back
