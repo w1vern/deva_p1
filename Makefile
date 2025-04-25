@@ -2,7 +2,7 @@ docker:
 	docker compose up -d
 
 docker_down:
-	docker compose down
+	docker compose down --volumes
 
 docker_build:
 	docker compose up -d --build
