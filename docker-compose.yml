@@ -80,7 +80,7 @@ services:
   backend:
     build:
       context: ./deva_p1_back
-    command: bash -c "uvicorn back.main:app --host 0.0.0.0 --port 8000"
+    command: bash -c "uvicorn back.main:app --host 0.0.0.0 --port 8000 --workers ${WORKERS_COUNT}"
     env_file:
       - .env
     depends_on:
