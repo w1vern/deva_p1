@@ -1,0 +1,35 @@
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+  redis:
+    ports:
+      - "6379:6379"
+  rabbitmq:
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  backend:
+    profiles:
+      - with_back
+    ports:
+      - "8000:8000"
+
+  frontend:
+    profiles:
+      - with_front
+    ports:
+      - "3000:3000"
+
+  nginx:
+    profiles:
+      - with_front
+
+
