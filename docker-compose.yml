@@ -24,6 +24,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app-network
+    deploy:
+      replicas: ${INCLUDE_POSTGRES}
 
   redis:
     image: redis:7
@@ -44,6 +46,8 @@ services:
       start_period: 10s
     networks:
       - app-network
+    deploy:
+      replicas: ${INCLUDE_RABBIT}
 
   minio:
     image: minio/minio:latest
@@ -61,21 +65,24 @@ services:
       - app-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
+    deploy:
+      replicas: ${INCLUDE_MINIO}
 
   createbuckets:
     image: minio/mc:latest
     depends_on:
       minio:
         condition: service_healthy
-
     entrypoint: >
       /bin/sh -c " /usr/bin/mc config host add myminio http://minio:9000 ${MINIO_USER} ${MINIO_PASSWORD}; /usr/bin/mc mb myminio/${MINIO_BUCKET}; /usr/bin/mc admin user svcacct add \ --access-key ${MINIO_ACCESS_KEY} \ --secret-key ${MINIO_SECRET_KEY} \ myminio ${MINIO_USER}; exit 0; "
     networks:
       - app-network
+    deploy:
+      replicas: ${INCLUDE_MINIO}
 
   backend:
     build:
@@ -104,24 +111,21 @@ services:
       context: ./deva-proj1-front
     env_file:
       - .env
-    depends_on:
-      backend:
-        condition: service_started
     networks:
       - app-network
+    profiles:
+      - with_front
 
   nginx:
     image: nginx:latest
     volumes:
       - ./nginx:/etc/nginx/conf.d
       - ./logs:/var/log/nginx/
-    ports:
-      - 80:80
     restart: always
-    depends_on:
-      - frontend
     networks:
       - app-network
+    profiles:
+      - with_front
 
   ai-transcribe-cpu:
     <<: *ai-base
@@ -144,7 +148,7 @@ services:
       resources:
         reservations:
           devices:
-            - capabilities: [ "gpu" ]
+            - capabilities: ["gpu"]
     profiles:
       - nvidia
 
@@ -171,9 +175,6 @@ services:
     restart: "no"
     env_file:
       - .env
-    environment:
-      DATABASE_URL: >
-        postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_IP}:${DB_PORT}/${DB_NAME}
     depends_on:
       - postgres
     networks:
@@ -184,7 +185,6 @@ volumes:
   redis_data:
   rabbitmq_data:
   minio_data:
-
 
 networks:
   app-network:

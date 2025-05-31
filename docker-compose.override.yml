@@ -17,19 +17,15 @@ services:
       - "9001:9001"
 
   backend:
-    profiles:
-      - with_back
     ports:
       - "8000:8000"
 
   frontend:
-    profiles:
-      - with_front
     ports:
       - "3000:3000"
 
   nginx:
-    profiles:
-      - with_front
+    ports:
+      - 80:80
 
 
