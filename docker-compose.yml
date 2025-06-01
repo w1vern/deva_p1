@@ -10,8 +10,6 @@ x-ai-base: &ai-base
       condition: service_healthy
   volumes:
     - ./cache/hugging_face_cache:/root/.cache/huggingface
-  networks:
-    - app-network
 
 services:
   postgres:
@@ -22,8 +20,6 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
     deploy:
       replicas: ${INCLUDE_POSTGRES}
 
@@ -31,8 +27,6 @@ services:
     image: redis:7
     volumes:
       - redis_data:/data
-    networks:
-      - app-network
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -44,8 +38,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 10s
-    networks:
-      - app-network
     deploy:
       replicas: ${INCLUDE_RABBIT}
 
@@ -61,8 +53,6 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
     volumes:
       - minio_data:/data
-    networks:
-      - app-network
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -79,8 +69,6 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c " /usr/bin/mc config host add myminio http://minio:9000 ${MINIO_USER} ${MINIO_PASSWORD}; /usr/bin/mc mb myminio/${MINIO_BUCKET}; /usr/bin/mc admin user svcacct add \ --access-key ${MINIO_ACCESS_KEY} \ --secret-key ${MINIO_SECRET_KEY} \ myminio ${MINIO_USER}; exit 0; "
-    networks:
-      - app-network
     deploy:
       replicas: ${INCLUDE_MINIO}
 
@@ -101,8 +89,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    networks:
-      - app-network
     profiles:
       - with_back
 
@@ -111,8 +97,6 @@ services:
       context: ./deva-proj1-front
     env_file:
       - .env
-    networks:
-      - app-network
     profiles:
       - with_front
 
@@ -122,8 +106,6 @@ services:
       - ./nginx:/etc/nginx/conf.d
       - ./logs:/var/log/nginx/
     restart: always
-    networks:
-      - app-network
     profiles:
       - with_front
 
@@ -177,8 +159,7 @@ services:
       - .env
     depends_on:
       - postgres
-    networks:
-      - app-network
+
 
 volumes:
   postgres_data:
@@ -186,6 +167,4 @@ volumes:
   rabbitmq_data:
   minio_data:
 
-networks:
-  app-network:
-    driver: bridge
+
