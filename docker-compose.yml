@@ -106,6 +106,9 @@ services:
       - ./nginx:/etc/nginx/conf.d
       - ./logs:/var/log/nginx/
     restart: always
+    depends_on:
+      frontend:
+        condition: service_started
     profiles:
       - with_front
 
