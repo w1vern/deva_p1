@@ -63,12 +63,12 @@ services:
       replicas: ${INCLUDE_MINIO}
 
   createbuckets:
-    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    image: minio/mc:latest
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
-      /bin/sh -c " /usr/bin/mc config host add myminio http://minio:9000 ${MINIO_USER} ${MINIO_PASSWORD}; /usr/bin/mc mb myminio/${MINIO_BUCKET}; /usr/bin/mc admin user svcacct add \ --access-key ${MINIO_ACCESS_KEY} \ --secret-key ${MINIO_SECRET_KEY} \ myminio ${MINIO_USER}; exit 0; "
+      /bin/sh -c " /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_USER} ${MINIO_PASSWORD}; /usr/bin/mc mb myminio/${MINIO_BUCKET}; /usr/bin/mc admin user svcacct add \ --access-key ${MINIO_ACCESS_KEY} \ --secret-key ${MINIO_SECRET_KEY} \ myminio ${MINIO_USER}; exit 0; "
     deploy:
       replicas: ${INCLUDE_MINIO}
 
