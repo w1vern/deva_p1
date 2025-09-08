@@ -109,6 +109,8 @@ services:
     depends_on:
       frontend:
         condition: service_started
+    ports:
+      - 80:80
     profiles:
       - with_front
 
@@ -163,11 +165,8 @@ services:
     depends_on:
       - postgres
 
-
 volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
   minio_data:
-
-
