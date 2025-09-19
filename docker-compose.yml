@@ -10,6 +10,7 @@ x-ai-base: &ai-base
       condition: service_healthy
   volumes:
     - ./cache/hugging_face_cache:/root/.cache/huggingface
+  restart: unless-stopped
 
 services:
   postgres:
@@ -22,11 +23,13 @@ services:
       - postgres_data:/var/lib/postgresql/data
     deploy:
       replicas: ${INCLUDE_POSTGRES}
+    restart: unless-stopped
 
   redis:
     image: redis:7
     volumes:
       - redis_data:/data
+    restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -40,6 +43,7 @@ services:
       start_period: 10s
     deploy:
       replicas: ${INCLUDE_RABBIT}
+    restart: unless-stopped
 
   minio:
     image: minio/minio:latest
@@ -49,6 +53,8 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
     volumes:
       - minio_data:/data
+    restart: unless-stopped
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://minio:9000/minio/health/live"]
       interval: 30s
@@ -86,6 +92,7 @@ services:
         condition: service_healthy
     profiles:
       - with_back
+    restart: unless-stopped
 
   frontend:
     build:
@@ -94,13 +101,14 @@ services:
       - .env
     profiles:
       - with_front
+    restart: unless-stopped
 
   nginx:
     image: nginx:latest
     volumes:
       - ./nginx:/etc/nginx/conf.d
       - ./logs:/var/log/nginx/
-    restart: always
+    restart: unless-stopped
     depends_on:
       frontend:
         condition: service_started
@@ -154,7 +162,6 @@ services:
     build:
       context: ./deva_p1_back
     command: alembic upgrade head
-    restart: "no"
     env_file:
       - .env
     depends_on:
