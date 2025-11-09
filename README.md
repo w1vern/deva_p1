@@ -18,5 +18,5 @@ find . -name ".env.example" -exec cat {} \; | sort | uniq > .env
 4. Start the application using Docker Compose
 
 ```
-docker compose -f docker-compose.yml up -d
+docker compose up -d
 ```
